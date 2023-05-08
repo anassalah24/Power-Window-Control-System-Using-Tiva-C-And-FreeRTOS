@@ -14,7 +14,7 @@ NB: ofcourse hardware interrupts preempts all the above tasks
 
 
 //needed Libraries
-
+#include "inc/hw_memmap.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <FreeRTOS.h>
@@ -23,17 +23,26 @@ NB: ofcourse hardware interrupts preempts all the above tasks
 #include "tm4c123gh6pm.h"
 #include "timers.h"
 #include "lcd.h"
-#include "inc/hw_memmap.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/gpio.h"
 #include "semphr.h"
 #include "inc/hw_types.h"
 #include "driverlib/interrupt.h"
 #include "inc/hw_gpio.h"
+#include "driverlib/pwm.h"
 
-// defines needed in code
+//defines needed in code
 #define DEBOUNCE_DELAY_MS 50
 #define LONG_PRESS_DELAY_MS 1000
+
+
+
+#define ENA_PIN GPIO_PIN_2
+#define IN1_PIN GPIO_PIN_3
+#define IN2_PIN GPIO_PIN_4
+#define ENB_PIN GPIO_PIN_5
+#define IN3_PIN GPIO_PIN_6
+#define IN4_PIN GPIO_PIN_7
 
 //strings to be printed on lcd to display the current state and any actions encountered
 static const char *pctextforlcd1 = "driver up auto";
@@ -55,6 +64,8 @@ static volatile bool lowerLimitReached = false;
 static void vlcdWrite(void *pvParameters);
 void portCinit();
 void portEinit();
+void motorinit(void);
+
 void buttonTask(void *pvParameters);
 void drivUpAuto(void *pvParameters);
 void drivDownAuto(void *pvParameters);
@@ -69,6 +80,9 @@ void setLowerLimit(void *pvParameters);
 void setWindowLock(void *pvParameters);
 void setJamDetected(void *pvParameters);
 
+void motor_forward();
+void motor_backward();
+void motor_stop();
 
 //Tasks Handles for all tasks (needed to delete tasks 
 TaskHandle_t xdrivUpAutoHandle;
@@ -127,9 +141,8 @@ int main(){
 	// initialize LCD 
 	LCD_init();
 	LCD_Clear();//clear LCD
-	
+	motorinit();//init motor 
 
-	
 	// Create the sporadic tasks (will be blocked initially because binary semaphore is empty / not given)
 	// have highest priorities
   xTaskCreate(setUpperLimit, "setupper", 128, NULL, 4, NULL);
@@ -321,11 +334,13 @@ void drivUpAuto(void *pvParameters)
 	//keep moving window up as long as not upper limit detected , no jamming and no window lock engaged
 	while((!upperLimitReached) && (jamDetected == 0) && (windowLock == 0)){
 		//TODO:turn motor uppp
+		motor_forward();
 		lowerLimitReached = false;//beacuse window moved up
 	}
 	
 	//if window lock engaged stop motor from turning and display
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xdrivUpAutoHandle);//delete task 
@@ -333,9 +348,14 @@ void drivUpAuto(void *pvParameters)
 	
 	// if jamming was detected
 	if(jamDetected == 1){
-		
 		//TODO:implement jam detection protocol (stop motor , move down for 0.5 sec)
+		motor_stop();
+		TickType_t xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_backward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xdrivUpAutoHandle);//delete task
@@ -345,6 +365,7 @@ void drivUpAuto(void *pvParameters)
 	// if upper limit is reached (stop motor)
 	if(upperLimitReached){
 		//TODO:stop motor
+		motor_stop();
 		LCD_PrintLn(1,"Upper limit");
 		LCD_Clear();
 		vTaskDelete(xdrivUpAutoHandle);//delete task
@@ -368,28 +389,38 @@ void drivUpManu(void *pvParameters)
 	//Extra step : keep moving motor as long as button is pressed because this is manual mode
 	while ((!GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_4)) && (!upperLimitReached) && (jamDetected == 0) && (windowLock == 0)){
 		//TODO:turn motor uppp
+		motor_forward();
 		lowerLimitReached = false;
 	}
 	
 	//Extra step : if button is released (stop motor)
 	if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_4)){
+		motor_stop();
 		LCD_PrintLn(1,"button release");
 		LCD_Clear();
 		vTaskDelete(xdrivUpManuHandle);
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xdrivUpManuHandle);
 	}
 	if(jamDetected == 1){
-		LCD_PrintLn(1,"Jam detected");
 		//TODO: implement jam detection protocol
+		motor_stop();
+		TickType_t xLastWakeTime =  xTaskGetTickCount();	
+		LCD_PrintLn(1,"Jam detected");
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_backward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xdrivUpManuHandle);
 	}
 	if(upperLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Upper limit");
 		LCD_Clear();
 		vTaskDelete(xdrivUpManuHandle);
@@ -412,21 +443,29 @@ void drivDownAuto(void *pvParameters)
 	vlcdWrite((void*)pctextforlcd3);
 	while((!lowerLimitReached) && (jamDetected == 0) && (windowLock == 0)){//ask if jam detected needed here??
 		//TODO: Turn motor downnn
+		motor_backward();
 		upperLimitReached = false;
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xdrivDownAutoHandle);
 	}
 	if(jamDetected == 1){
+		motor_stop();
+		TickType_t xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
-		//TODO: Implement jam detection protocol
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_forward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xdrivDownAutoHandle);
 	}
 	if(lowerLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Lower limit");
 		LCD_Clear();
 		vTaskDelete(xdrivDownAutoHandle);
@@ -449,26 +488,35 @@ void drivDownManu(void *pvParameters)
 	vlcdWrite((void*)pctextforlcd4);
 	while ((!GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_5)) && (!lowerLimitReached) && (jamDetected == 0) && (windowLock == 0)){
 		//TODO: Turn motor downnn
+		motor_backward();
 		upperLimitReached = false;
 	}
 	if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_5)){
+		motor_stop();
 		LCD_PrintLn(1,"button release");
 		LCD_Clear();
 		vTaskDelete(xdrivDownManuHandle);
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xdrivDownManuHandle);
 	}
 	if(jamDetected == 1){
+		motor_stop();
+		TickType_t xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
-		//TODO: Implement jam detection protocol
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_forward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xdrivDownManuHandle);
 	}
 	if(lowerLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Lower limit");
 		LCD_Clear();
 		vTaskDelete(xdrivDownManuHandle);
@@ -476,6 +524,7 @@ void drivDownManu(void *pvParameters)
 
 	vTaskDelete(xdrivDownManuHandle);
 }
+
 
 
 
@@ -498,6 +547,7 @@ void passUpAuto(void *pvParameters)
 	vlcdWrite((void*)pctextforlcd5);
 	while((!upperLimitReached) && (jamDetected == 0) && (windowLock == 0)){
 		//TODO: Turn motor uppp
+		motor_forward();
 		lowerLimitReached = false;
 		
 		//Extra Step : Poll on Driver Buttons to check if pressed and preempt the current task to go to driver of pressed
@@ -588,18 +638,25 @@ void passUpAuto(void *pvParameters)
 			}
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xpassUpAutoHandle);
 	}
 	if(jamDetected == 1){
+		motor_stop();
+		xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
-		//TODO: Implement jam detection protocol
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_backward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xpassUpAutoHandle);
 	}
 	if(upperLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Upper limit");
 		LCD_Clear();
 		vTaskDelete(xpassUpAutoHandle);
@@ -624,6 +681,7 @@ void passUpManu(void *pvParameters)
 	vlcdWrite((void*)pctextforlcd6);
 	while ((!GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_6)) && (!upperLimitReached) && (jamDetected == 0) && (windowLock == 0)){
 		//TODO:turn motor uppp
+		motor_forward();
 		lowerLimitReached = false;
 		
 		//Extra Steps
@@ -706,23 +764,31 @@ void passUpManu(void *pvParameters)
 			}
 	}
 	if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_6)){
+		motor_stop();
 		LCD_PrintLn(1,"button release");
 		LCD_Clear();
 		vTaskDelete(xpassUpManuHandle);
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xpassUpManuHandle);
 	}
 	if(jamDetected == 1){
+		motor_stop();
+		xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
-		//TODO: Implement jam detection protocol
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_backward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xpassUpManuHandle);
 	}
 	if(upperLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Upper limit");
 		LCD_Clear();
 		vTaskDelete(xpassUpManuHandle);
@@ -746,6 +812,7 @@ void passDownAuto(void *pvParameters)
 	vlcdWrite((void*)pctextforlcd7);
 	while((!lowerLimitReached) && (jamDetected == 0) && (windowLock == 0)){//ask if jam detected needed here??
 		//TODO: Turn motor downnn
+		motor_backward();
 		upperLimitReached = false;
 		
 		//Extra steps
@@ -832,18 +899,25 @@ void passDownAuto(void *pvParameters)
 		
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xpassDownAutoHandle);
 	}
 	if(jamDetected == 1){
+		motor_stop();
+		xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
-		//TODO: Implement jam detection protocol
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_forward();
+		}
+		motor_stop();
 		jamDetected = 0;
 		LCD_Clear();
 		vTaskDelete(xpassDownAutoHandle);
 	}
 	if(lowerLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Lower limit");
 		LCD_Clear();
 		vTaskDelete(xpassDownAutoHandle);
@@ -869,6 +943,7 @@ void passDownManu(void *pvParameters)
 	vlcdWrite((void*)pctextforlcd8);
 	while ((!GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_7)) && (!lowerLimitReached) && (jamDetected == 0) && (windowLock == 0)){
 		//TODO: Turn motor downnn
+		motor_backward();
 		upperLimitReached = false;	
 		
 		//Extra Steps
@@ -954,23 +1029,31 @@ void passDownManu(void *pvParameters)
 			}		
 	}
 	if(GPIOPinRead(GPIO_PORTC_BASE, GPIO_PIN_7)){
+		motor_stop();
 		LCD_PrintLn(1,"button release");
 		LCD_Clear();
 		vTaskDelete(xpassDownManuHandle);
 	}
 	if(windowLock == 1){
+		motor_stop();
 		LCD_PrintLn(1,"Window lock");
 		LCD_Clear();
 		vTaskDelete(xpassDownManuHandle);
 	}
 	if(jamDetected == 1){
+		motor_stop();
+		xLastWakeTime =  xTaskGetTickCount();	
 		LCD_PrintLn(1,"Jam detected");
-		//TODO: Implement jam detection protocol
+		while((xTaskGetTickCount() - xLastWakeTime) < pdMS_TO_TICKS(1000)){
+			motor_forward();
+		}
+		motor_stop();
 		jamDetected = 0;
-		LCD_Clear();
+		LCD_Clear();;
 		vTaskDelete(xpassDownManuHandle);
 	}
 	if(lowerLimitReached){
+		motor_stop();
 		LCD_PrintLn(1,"Lower limit");
 		LCD_Clear();
 		vTaskDelete(xpassDownManuHandle);
@@ -987,7 +1070,10 @@ void passDownManu(void *pvParameters)
 
 
 
+
+
 //Sporadic Tasks To change state of jamming , locking and limits
+
 void setUpperLimit(void *pvParameters)
 {
 	xSemaphoreTake(xupperLimitReachedSemaphore, 0);//defensive mechanism
@@ -1046,12 +1132,15 @@ void setJamDetected(void *pvParameters)
 
 
 
-//not needed anymore (cal lcd print directly)
+
+//not needed anymore (call lcd print directly)
+
 static void vlcdWrite(void *pvParameters){
 	
 	char *pclcdprint = (char*)pvParameters;
 	LCD_PrintLn(0,pclcdprint);
 }
+
 
 // Interrupt handler for the 4 interrupt buttons (jamming , locking , upper limit , lower limit)
 void PortE_ISR_Handler(void)
@@ -1100,6 +1189,7 @@ void PortE_ISR_Handler(void)
 
 
 
+
 //PORT C initializations
 void portCinit(){
 	
@@ -1114,6 +1204,9 @@ void portCinit(){
 
 
 
+
+
+//PORT E initializations
 void portEinit()
 {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE); // Enable the GPIO port E
@@ -1138,6 +1231,35 @@ void portEinit()
 
 
 
+
+
+
+void motorinit() {
+    // Initialize GPIO pins for L298N control
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE, ENA_PIN | IN1_PIN | IN2_PIN | ENB_PIN | IN3_PIN | IN4_PIN);
+}
+
+
+
+void motor_forward() {
+    // Drive motors forward
+    GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN3_PIN, IN1_PIN | IN3_PIN);
+    GPIOPinWrite(GPIO_PORTA_BASE, IN2_PIN | IN4_PIN, 0);
+}
+
+
+void motor_backward() {
+    // Drive motors backward
+    GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN3_PIN, 0);
+    GPIOPinWrite(GPIO_PORTA_BASE, IN2_PIN | IN4_PIN, IN2_PIN | IN4_PIN);
+}
+
+
+void motor_stop() {
+    // Stop motors
+    GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN2_PIN | IN3_PIN | IN4_PIN, 0);
+}
 
 
 
