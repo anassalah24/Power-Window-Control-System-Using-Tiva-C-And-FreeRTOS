@@ -164,6 +164,7 @@ int main(){
 This tasks polls on every button belnging to driver and passenger and detect if the button was 
 pressed and released instantly (Automatic Mode) or was pressed for a while (2 seconds)(Manual Mode)
 */
+
 void buttonTask(void *pvParameters)
 {	
     // Define variables to keep track of button states and times
@@ -320,6 +321,7 @@ void buttonTask(void *pvParameters)
 //DRIVER TASKS
 
 // This Task is needed to move the window Up automatically by Driver
+
 void drivUpAuto(void *pvParameters)
 {
 	LCD_Clear();
@@ -377,6 +379,7 @@ void drivUpAuto(void *pvParameters)
 
 
 // This Task is needed to move the window UP Manually by Driver 
+
 void drivUpManu(void *pvParameters)
 {	
 	LCD_Clear();
@@ -433,6 +436,7 @@ void drivUpManu(void *pvParameters)
 
 
 // This Task is needed to move the window Down Automatically by Driver
+
 void drivDownAuto(void *pvParameters)
 {	
 	LCD_Clear();
@@ -478,6 +482,7 @@ void drivDownAuto(void *pvParameters)
 
 
 // This Task is needed to move the window Down Manually by Driver
+
 void drivDownManu(void *pvParameters)
 {
 	LCD_Clear();
@@ -668,6 +673,7 @@ void passUpAuto(void *pvParameters)
 
 
 
+
 void passUpManu(void *pvParameters)
 {
 	// Define variables to keep track of button states and times
@@ -799,6 +805,7 @@ void passUpManu(void *pvParameters)
 
 
 
+
 void passDownAuto(void *pvParameters)
 {
 	// Define variables to keep track of button states and times
@@ -925,6 +932,7 @@ void passDownAuto(void *pvParameters)
 
 	vTaskDelete(xpassDownAutoHandle);
 }
+
 
 
 
@@ -1086,6 +1094,7 @@ void setUpperLimit(void *pvParameters)
 	}
 }
 
+
 void setLowerLimit(void *pvParameters)
 {
 
@@ -1098,6 +1107,7 @@ void setLowerLimit(void *pvParameters)
 	lowerLimitReached = true;
 	}
 }
+
 
 void setWindowLock(void *pvParameters)
 {
@@ -1116,6 +1126,7 @@ void setWindowLock(void *pvParameters)
 	}
 }
 
+
 void setJamDetected(void *pvParameters)
 {
 	
@@ -1133,13 +1144,14 @@ void setJamDetected(void *pvParameters)
 
 
 
-//not needed anymore (call lcd print directly)
 
+//not needed anymore (call lcd print directly)
 static void vlcdWrite(void *pvParameters){
 	
 	char *pclcdprint = (char*)pvParameters;
 	LCD_PrintLn(0,pclcdprint);
 }
+
 
 
 // Interrupt handler for the 4 interrupt buttons (jamming , locking , upper limit , lower limit)
@@ -1190,6 +1202,7 @@ void PortE_ISR_Handler(void)
 
 
 
+
 //PORT C initializations
 void portCinit(){
 	
@@ -1199,6 +1212,7 @@ void portCinit(){
 
 
 }
+
 
 
 
@@ -1234,11 +1248,13 @@ void portEinit()
 
 
 
+
 void motorinit() {
     // Initialize GPIO pins for L298N control
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
     GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE, ENA_PIN | IN1_PIN | IN2_PIN | ENB_PIN | IN3_PIN | IN4_PIN);
 }
+
 
 
 
@@ -1249,11 +1265,13 @@ void motor_forward() {
 }
 
 
+
 void motor_backward() {
     // Drive motors backward
     GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN3_PIN, 0);
     GPIOPinWrite(GPIO_PORTA_BASE, IN2_PIN | IN4_PIN, IN2_PIN | IN4_PIN);
 }
+
 
 
 void motor_stop() {

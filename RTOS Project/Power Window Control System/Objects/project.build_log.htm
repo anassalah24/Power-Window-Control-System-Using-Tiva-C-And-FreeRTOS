@@ -21,8 +21,8 @@ Target DLL:      lmidk-agdi.dll V???
 Dialog DLL:      TCM.DLL V1.56.4.0
  
 <h2>Project:</h2>
-D:\Subjects\Real Time\labs\lab 5 - Copy\project.uvprojx
-Project File Date:  04/28/2023
+D:\Power-Window-Control-System-Using-Tiva-C-And-FreeRTOS\RTOS Project\Power Window Control System\project.uvprojx
+Project File Date:  05/11/2023
 
 <h2>Output:</h2>
 *** Using Compiler 'V6.19', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
@@ -35,6 +35,7 @@ compiling lcd.c...
 compiling heap_2.c...
 compiling port.c...
 compiling timers.c...
+compiling queue.c...
 main.c(20): warning: In file included from...
 C:/Users/Anas/AppData/Local/Arm/Packs/ARM/CMSIS-FreeRTOS/10.5.1/Source/include\FreeRTOS.h(59): warning: In file included from...
 ./RTE/RTOS\FreeRTOSConfig.h(45): warning: In file included from...
@@ -451,7 +452,6 @@ C:/ti/TivaWare_C_Series-2.2.0.295\inc/hw_memmap.h(137): note: previous definitio
         ^
 46 warnings generated.
 compiling main.c...
-compiling queue.c...
 compiling tasks.c...
 linking...
 Program Size: Code=24312 RO-data=1284 RW-data=1644 ZI-data=9236  
@@ -496,13 +496,13 @@ Package Vendor: Keil
 
    * Component: ARM.FreeRTOS::RTOS:Core:Cortex-M:10.5.1
       Source file:   CMSIS/RTOS2/FreeRTOS/Source/freertos_evr.c
-      Source file:   Source/list.c
-      Include file:  Source/include/task.h
       Source file:   Source/queue.c
+      Include file:  Source/include/task.h
+      Source file:   Source/list.c
+      Source file:   Source/tasks.c
       Include file:  Source/include/queue.h
       Include file:  Source/include/FreeRTOS.h
       Include file:  Source/include/semphr.h
-      Source file:   Source/tasks.c
       Source file:   Source/portable/GCC/ARM_CM4F/port.c
 
    * Component: ARM.FreeRTOS::RTOS:Heap:Heap_2:10.5.1
@@ -515,8 +515,8 @@ Package Vendor: Keil
    * Component: ARM::CMSIS:CORE:5.6.0
 
    * Component: Keil::Device:Startup:1.0.1
-      Source file:   Device/Source/ARM/startup_TM4C123.s
       Include file:  Device/Include/TM4C123/TM4C123.h
+      Source file:   Device/Source/ARM/startup_TM4C123.s
       Source file:   Device/Source/system_TM4C123.c
 Build Time Elapsed:  00:00:02
 </pre>
