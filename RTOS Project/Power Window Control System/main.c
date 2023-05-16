@@ -30,19 +30,12 @@ NB: ofcourse hardware interrupts preempts all the above tasks
 #include "driverlib/interrupt.h"
 #include "inc/hw_gpio.h"
 #include "driverlib/pwm.h"
+#include "motor.h"
 
 //defines needed in code
 #define DEBOUNCE_DELAY_MS 50
 #define LONG_PRESS_DELAY_MS 1000
 
-
-
-#define ENA_PIN GPIO_PIN_2
-#define IN1_PIN GPIO_PIN_3
-#define IN2_PIN GPIO_PIN_4
-#define ENB_PIN GPIO_PIN_5
-#define IN3_PIN GPIO_PIN_6
-#define IN4_PIN GPIO_PIN_7
 
 //strings to be printed on lcd to display the current state and any actions encountered
 static const char *pctextforlcd1 = "driver up auto";
@@ -64,8 +57,6 @@ static volatile bool lowerLimitReached = false;
 static void vlcdWrite(void *pvParameters);
 void portCinit();
 void portEinit();
-void motorinit(void);
-
 void buttonTask(void *pvParameters);
 void drivUpAuto(void *pvParameters);
 void drivDownAuto(void *pvParameters);
@@ -80,9 +71,6 @@ void setLowerLimit(void *pvParameters);
 void setWindowLock(void *pvParameters);
 void setJamDetected(void *pvParameters);
 
-void motor_forward();
-void motor_backward();
-void motor_stop();
 
 //Tasks Handles for all tasks (needed to delete tasks) 
 TaskHandle_t xdrivUpAutoHandle;
@@ -161,7 +149,7 @@ int main(){
 
 
 /*
-This tasks polls on every button belnging to driver and passenger and detect if the button was 
+This tasks polls on every button belonging to driver and passenger and detect if the button was 
 pressed and released instantly (Automatic Mode) or was pressed for a while (2 seconds)(Manual Mode)
 */
 
@@ -316,6 +304,11 @@ void buttonTask(void *pvParameters)
 	}
 
 }
+
+
+
+
+
 
 
 //DRIVER TASKS
@@ -529,6 +522,12 @@ void drivDownManu(void *pvParameters)
 
 	vTaskDelete(xdrivDownManuHandle);
 }
+
+
+
+
+
+
 
 
 
@@ -1080,6 +1079,11 @@ void passDownManu(void *pvParameters)
 
 
 
+
+
+
+
+
 //Sporadic Tasks To change state of jamming , locking and limits
 
 void setUpperLimit(void *pvParameters)
@@ -1140,6 +1144,18 @@ void setJamDetected(void *pvParameters)
 	}
  
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1241,42 +1257,6 @@ void portEinit()
 	
 		//enable cpu interrupts
 		IntMasterEnable();
-}
-
-
-
-
-
-
-
-void motorinit() {
-    // Initialize GPIO pins for L298N control
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-    GPIOPinTypeGPIOOutput(GPIO_PORTA_BASE, ENA_PIN | IN1_PIN | IN2_PIN | ENB_PIN | IN3_PIN | IN4_PIN);
-}
-
-
-
-
-void motor_forward() {
-    // Drive motors forward
-    GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN3_PIN, IN1_PIN | IN3_PIN);
-    GPIOPinWrite(GPIO_PORTA_BASE, IN2_PIN | IN4_PIN, 0);
-}
-
-
-
-void motor_backward() {
-    // Drive motors backward
-    GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN3_PIN, 0);
-    GPIOPinWrite(GPIO_PORTA_BASE, IN2_PIN | IN4_PIN, IN2_PIN | IN4_PIN);
-}
-
-
-
-void motor_stop() {
-    // Stop motors
-    GPIOPinWrite(GPIO_PORTA_BASE, IN1_PIN | IN2_PIN | IN3_PIN | IN4_PIN, 0);
 }
 
 
